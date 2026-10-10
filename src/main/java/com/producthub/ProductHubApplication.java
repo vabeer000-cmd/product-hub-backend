@@ -23,7 +23,7 @@ public class ProductHubApplication {
 			        LocalDateTime.parse("2026-09-12T21:14:19"),
 			        100016L
 			    )
-			);
+		);
 	}
 
 }
