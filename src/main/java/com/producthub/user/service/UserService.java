@@ -9,5 +9,7 @@ public interface UserService {
 	void register(RegisterRequest request);
 
 	LoginResponse login(LoginRequest request);
-    
+
+	void registerProductOwner(RegisterRequest request);
+
 }

@@ -3,7 +3,6 @@ package com.producthub.product.service.impl;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,6 +13,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import com.producthub.common.exception.ProductNotFoundException;
@@ -28,6 +31,9 @@ import com.producthub.product.entity.Product;
 import com.producthub.product.repository.ProductRepository;
 import com.producthub.product.service.ProductService;
 import com.producthub.product.util.CursorUtils;
+import com.producthub.user.entity.Role;
+import com.producthub.user.entity.User;
+import com.producthub.user.repository.UserRepository;
 
 import jakarta.persistence.OptimisticLockException;
 import jakarta.transaction.Transactional;
@@ -37,17 +43,19 @@ public class ProductServiceImpl implements ProductService{
 
 
 	private final ProductRepository productRepository;
+	private final UserRepository userRepository;
 	private static final Logger log =
-	        LoggerFactory.getLogger(ProductServiceImpl.class);
-	
-	public ProductServiceImpl(ProductRepository productRepository) {
+			LoggerFactory.getLogger(ProductServiceImpl.class);
+
+	public ProductServiceImpl(ProductRepository productRepository,UserRepository userRepository) {
 		this.productRepository = productRepository;
+		this.userRepository = userRepository;
 	}
-	
+
 	private ProductResponse mapToResponse(Product product) {
-		
+
 		ProductResponse response = new ProductResponse();
-		
+
 		response.setId(product.getId());
 		response.setName(product.getName());
 		response.setDescription(product.getDescription());
@@ -58,222 +66,363 @@ public class ProductServiceImpl implements ProductService{
 		response.setUpdatedAt(product.getUpdatedAt());
 		response.setImageUrl(product.getImageUrl());
 		response.setVersion(product.getVersion());
-		
+		response.setOwnerId(product.getOwnerId());
+
 		return response;
 	}
 
 	private Product mapToEntity(ProductCreateRequest request) {
 
-	    Product product = new Product();
+		Product product = new Product();
 
-	    product.setName(request.getName());
-	    product.setDescription(request.getDescription());
-	    product.setPrice(request.getPrice());
-	    product.setCategory(request.getCategory());
-	    product.setImageUrl(request.getImageUrl());
-	    product.setAvailable(true);
+		product.setName(request.getName());
+		product.setDescription(request.getDescription());
+		product.setPrice(request.getPrice());
+		product.setCategory(request.getCategory());
+		product.setImageUrl(request.getImageUrl());
+		product.setAvailable(true);
 
-	    return product;
+		return product;
 	}
-	
-	
-	
+
+
+
 
 	@Override
 	public Page<ProductResponse> getAllProducts(
-	        ProductFilter filter,
-	        Pageable pageable) {
+			ProductFilter filter,
+			Pageable pageable) {
 
-	    Specification<Product> specification =
-	            ProductSpecification.build(filter);
+		Specification<Product> specification =
+				ProductSpecification.build(filter);
 
-	    Page<Product> products =
-	            productRepository.findAll(
-	                    specification,
-	                    pageable
-	            );
-        System.err.println("products list length : "+products.getSize());
-	    return products.map(this::mapToResponse);
+		Page<Product> products =
+				productRepository.findAll(
+						specification,
+						pageable
+				);
+		System.err.println("products list length : "+products.getSize());
+		return products.map(this::mapToResponse);
 	}
 
-	
-	
+
+
 	@Override
 	public ProductResponse createProduct(ProductCreateRequest request) {
 		log.info("Creating product with name: {}", request.getName());
 
-	    Product product = mapToEntity(request);
+		Product product = mapToEntity(request);
+		Authentication authentication =
+				SecurityContextHolder.getContext().getAuthentication();
 
-	    Product savedProduct = productRepository.save(product);
+		String username = authentication.getName();
 
-	    log.info(
-	            "Product created successfully. id: {}, version: {}",
-	            savedProduct.getId(),
-	            savedProduct.getVersion()
-	    );
-	    return mapToResponse(savedProduct);
+		User user = userRepository.findByUsername(username)
+				.orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+		if (user.getRole() == Role.PRODUCTOWNER) {
+			product.setOwnerId(user.getId());
+		}
+		Product savedProduct = productRepository.save(product);
+
+		log.info(
+				"Product created successfully. id: {}, version: {}",
+				savedProduct.getId(),
+				savedProduct.getVersion()
+		);
+		return mapToResponse(savedProduct);
 	}
 
 	@Cacheable(value = "products", key = "'product:' + #id")
 	@Override
 	public ProductResponse getProductById(Long id) {
-		 log.info("Getting product. id: {}", id);
-	    Product product = productRepository.findById(id)
-	            .orElseThrow(() ->
-	                    new ProductNotFoundException(
-	                            "Product with id " + id + " not found"
-	                    )
-	            );
+		log.info("Getting product. id: {}", id);
+		Product product = productRepository.findById(id)
+				.orElseThrow(() ->
+						new ProductNotFoundException(
+								"Product with id " + id + " not found"
+						)
+				);
 
-	    return mapToResponse(product);
+		return mapToResponse(product);
 	}
-	
-	
+
+
+//	@Transactional
+//	@CachePut(value = "products", key = "'product:' + #id")
+//	@Override
+//	public ProductResponse updateProduct(Long id, ProductUpdateRequest  request) {
+//		log.info("Updating product. id: {}", id);
+//		Product product = productRepository.findById(id)
+//				.orElseThrow(()->
+//						new ProductNotFoundException("Product with id "+id+" not found"));
+//
+//		if (!request.getVersion().equals(product.getVersion())) {
+//			  log.warn(
+//			            "Optimistic lock conflict. id: {}, request version: {}, current version: {}",
+//			            id,
+//			            request.getVersion(),
+//			            product.getVersion()
+//			    );
+//		    throw new OptimisticLockException(
+//		            "Product was already modified by another user"
+//		    );
+//		}
+//		product.setName(request.getName());
+//		product.setDescription(request.getDescription());
+//	    product.setPrice(request.getPrice());
+//	    product.setCategory(request.getCategory());
+//	    product.setImageUrl(request.getImageUrl());
+//
+	////	    Product updatedProduct = productRepository.save(product);
+//	    Product updatedProduct = productRepository.saveAndFlush(product);
+//	    log.info(
+//	            "Product updated successfully. id: {}, new version: {}",
+//	            id,
+//	            updatedProduct.getVersion()
+//	    );
+//
+//	    return mapToResponse(updatedProduct);
+//
+//	}
+//
 	@Transactional
 	@CachePut(value = "products", key = "'product:' + #id")
 	@Override
-	public ProductResponse updateProduct(Long id, ProductUpdateRequest  request) {
+	public ProductResponse updateProduct(Long id, ProductUpdateRequest request) {
+
 		log.info("Updating product. id: {}", id);
+
 		Product product = productRepository.findById(id)
-				.orElseThrow(()->
-						new ProductNotFoundException("Product with id "+id+" not found"));
-		
+				.orElseThrow(() ->
+						new ProductNotFoundException(
+								"Product with id " + id + " not found"
+						));
+//
+//	    Authentication authentication =
+//	            SecurityContextHolder.getContext().getAuthentication();
+//
+//	    String username = authentication.getName();
+//
+//	    User user = userRepository.findByUsername(username)
+//	            .orElseThrow(() ->
+//	                    new UsernameNotFoundException("User not found"));
+//
+//	    if (user.getRole() == Role.PRODUCTOWNER
+//	            && !user.getId().equals(product.getOwnerId())) {
+//
+//	        throw new AccessDeniedException(
+//	                "You are not allowed to update this product"
+//	        );
+//	    }
+
+		validateProductOwnership(product);
+
 		if (!request.getVersion().equals(product.getVersion())) {
-			  log.warn(
-			            "Optimistic lock conflict. id: {}, request version: {}, current version: {}",
-			            id,
-			            request.getVersion(),
-			            product.getVersion()
-			    );
-		    throw new OptimisticLockException(
-		            "Product was already modified by another user"
-		    );
+			log.warn(
+					"Optimistic lock conflict. id: {}, request version: {}, current version: {}",
+					id,
+					request.getVersion(),
+					product.getVersion()
+			);
+
+			throw new OptimisticLockException(
+					"Product was already modified by another user"
+			);
 		}
+
 		product.setName(request.getName());
 		product.setDescription(request.getDescription());
-	    product.setPrice(request.getPrice());
-	    product.setCategory(request.getCategory());
-	    product.setImageUrl(request.getImageUrl());
+		product.setPrice(request.getPrice());
+		product.setCategory(request.getCategory());
+		product.setImageUrl(request.getImageUrl());
 
-//	    Product updatedProduct = productRepository.save(product);
-	    Product updatedProduct = productRepository.saveAndFlush(product);
-	    log.info(
-	            "Product updated successfully. id: {}, new version: {}",
-	            id,
-	            updatedProduct.getVersion()
-	    );
-	    
-	    return mapToResponse(updatedProduct);
-		
+		Product updatedProduct = productRepository.saveAndFlush(product);
+
+		log.info(
+				"Product updated successfully. id: {}, new version: {}",
+				id,
+				updatedProduct.getVersion()
+		);
+
+		return mapToResponse(updatedProduct);
 	}
-	
-	
+
+//	@CacheEvict(value = "products", key = "'product:' + #id")
+//	@Override
+//	public void deleteProduct(Long id) {
+//		log.info("Deleting product. id: {}", id);
+//		Authentication authentication =
+//		        SecurityContextHolder.getContext().getAuthentication();
+//
+//		String username = authentication.getName();
+//
+//		User user = userRepository.findByUsername(username)
+//		        .orElseThrow(() ->
+//		                new UsernameNotFoundException("User not found"));
+//
+//
+//		Product product = productRepository.findById(id)
+//				.orElseThrow(()->
+//					new ProductNotFoundException("Product with id "+id+" not found")
+//				);
+//
+//		if (user.getRole() == Role.PRODUCTOWNER
+//		        && !user.getId().equals(product.getOwnerId())) {
+//
+//		    throw new AccessDeniedException(
+//		            "You are not allowed to delete this product"
+//		    );
+//		}
+//
+//		productRepository.delete(product);
+//		log.info("Product deleted successfully. id: {}", id);
+//
+//	}
 
 	@CacheEvict(value = "products", key = "'product:' + #id")
 	@Override
 	public void deleteProduct(Long id) {
+
 		log.info("Deleting product. id: {}", id);
+
 		Product product = productRepository.findById(id)
-				.orElseThrow(()->
-					new ProductNotFoundException("Product with id "+id+" not found")
-				);
-		
+				.orElseThrow(() ->
+						new ProductNotFoundException(
+								"Product with id " + id + " not found"
+						));
+
+//	    Authentication authentication =
+//	            SecurityContextHolder.getContext().getAuthentication();
+//
+//	    String username = authentication.getName();
+//
+//	    User user = userRepository.findByUsername(username)
+//	            .orElseThrow(() ->
+//	                    new UsernameNotFoundException("User not found"));
+//
+//	    if (user.getRole() == Role.PRODUCTOWNER
+//	            && !user.getId().equals(product.getOwnerId())) {
+//
+//	        throw new AccessDeniedException(
+//	                "You are not allowed to delete this product"
+//	        );
+//	    }
+		validateProductOwnership(product);
 		productRepository.delete(product);
+
 		log.info("Product deleted successfully. id: {}", id);
-		
 	}
-	
+
 	@Override
 	public ProductCursorResponse getProductsByCursor(
-	        Integer limit,
-	        String cursor,
-	        String category,
-	        Boolean available,
-	        BigDecimal minPrice,
-	        BigDecimal maxPrice,
-	        String search) {
+			Integer limit,
+			String cursor,
+			String category,
+			Boolean available,
+			BigDecimal minPrice,
+			BigDecimal maxPrice,
+			String search) {
 
-	    if (limit == null || limit <= 0) {
-	        limit = 20;
-	    }
+		if (limit == null || limit <= 0) {
+			limit = 20;
+		}
 
-	    if (limit > 100) {
-	        limit = 100;
-	    }
+		if (limit > 100) {
+			limit = 100;
+		}
 
-	    Pageable pageable = PageRequest.of(0, limit + 1);
+		Pageable pageable = PageRequest.of(0, limit + 1);
 
-	    ProductCursor decodedCursor = null;
+		ProductCursor decodedCursor = null;
 
-	    if (cursor != null && !cursor.isBlank()) {
-	        decodedCursor = CursorUtils.decode(cursor);
-	    }
+		if (cursor != null && !cursor.isBlank()) {
+			decodedCursor = CursorUtils.decode(cursor);
+		}
 
-	    LocalDateTime afterCreatedAt = null;
-	    Long afterId = null;
+		LocalDateTime afterCreatedAt = null;
+		Long afterId = null;
 
-	    if (decodedCursor != null) {
-	        afterCreatedAt = decodedCursor.getCreatedAt();
-	        afterId = decodedCursor.getId();
-	    }
+		if (decodedCursor != null) {
+			afterCreatedAt = decodedCursor.getCreatedAt();
+			afterId = decodedCursor.getId();
+		}
 
-	    List<Product> products =
-	            productRepository.findProductsByCursor(
-	                    category,
-	                    available,
-	                    minPrice,
-	                    maxPrice,
-	                    search,
-	                    afterCreatedAt,
-	                    afterId,
-	                    pageable
-	            );
+		List<Product> products =
+				productRepository.findProductsByCursor(
+						category,
+						available,
+						minPrice,
+						maxPrice,
+						search,
+						afterCreatedAt,
+						afterId,
+						pageable
+				);
 
-	    boolean hasNext = products.size() > limit;
+		boolean hasNext = products.size() > limit;
 
-	    if (hasNext) {
-	        products = products.subList(0, limit);
-	    }
+		if (hasNext) {
+			products = products.subList(0, limit);
+		}
 
-	    String nextCursor = null;
+		String nextCursor = null;
 
-	    if (hasNext && !products.isEmpty()) {
+		if (hasNext && !products.isEmpty()) {
 
-	        Product lastProduct =
-	                products.get(products.size() - 1);
+			Product lastProduct =
+					products.get(products.size() - 1);
 
-	        nextCursor = CursorUtils.encode(
-	                lastProduct.getCreatedAt(),
-	                lastProduct.getId()
-	        );
-	    }
+			nextCursor = CursorUtils.encode(
+					lastProduct.getCreatedAt(),
+					lastProduct.getId()
+			);
+		}
 
-	    List<ProductResponse> response =
-	            products.stream()
-	                    .map(this::mapToResponse)
-	                    .toList();
+		List<ProductResponse> response =
+				products.stream()
+						.map(this::mapToResponse)
+						.toList();
 
-	    return new ProductCursorResponse(
-	            response,
-	            nextCursor,
-	            hasNext
-	    );
+		return new ProductCursorResponse(
+				response,
+				nextCursor,
+				hasNext
+		);
 	}
 
 	@Override
 	@Transactional
 	public void updatePriductByIdWithOutSave(Long id) {
 		Product productEntity = productRepository.findById(id).orElseThrow( ()->
-			new ProductNotFoundException("Product ")
+				new ProductNotFoundException("Product ")
 		);
-		
-		productEntity.setName("Updated product without save");
-		
-		
-		
-	}
-	
-	
 
-	
+		productEntity.setName("Updated product without save");
+
+
+
+	}
+
+
+	private void validateProductOwnership(Product product) {
+
+		Authentication authentication =
+				SecurityContextHolder.getContext().getAuthentication();
+
+		String username = authentication.getName();
+
+		User user = userRepository.findByUsername(username)
+				.orElseThrow(() ->
+						new UsernameNotFoundException("User not found"));
+
+		if (user.getRole() == Role.PRODUCTOWNER
+				&& !user.getId().equals(product.getOwnerId())) {
+
+			throw new AccessDeniedException(
+					"You are not allowed to modify this product"
+			);
+		}
+	}
+
 }

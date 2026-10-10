@@ -19,6 +19,7 @@ import jakarta.persistence.Version;
 @Entity
 @EntityListeners(AuditingEntityListener.class)
 @Table(name = "products")
+
 public class Product {
 
 	@Id
@@ -128,7 +129,10 @@ public class Product {
     
     @Column(name = "available", nullable = false)
     private Boolean available;
-    
+
+	@Column(name = "owner_id")
+	private Long ownerId;
+
     public Boolean getAvailable() {
 		return available;
 	}
@@ -140,4 +144,12 @@ public class Product {
 	public Product() {
     }
 
+
+	public Long getOwnerId() {
+		return ownerId;
+	}
+
+	public void setOwnerId(Long ownerId) {
+		this.ownerId = ownerId;
+	}
 }
