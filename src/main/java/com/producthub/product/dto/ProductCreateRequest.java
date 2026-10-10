@@ -6,48 +6,54 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
+@Getter
+@Setter
+@NoArgsConstructor
 public class ProductCreateRequest {
 
-	public String getName() {
-		return name;
-	}
-
-	public void setName(String name) {
-		this.name = name;
-	}
-
-	public String getDescription() {
-		return description;
-	}
-
-	public void setDescription(String description) {
-		this.description = description;
-	}
-
-	public BigDecimal getPrice() {
-		return price;
-	}
-
-	public void setPrice(BigDecimal price) {
-		this.price = price;
-	}
-
-	public String getCategory() {
-		return category;
-	}
-
-	public void setCategory(String category) {
-		this.category = category;
-	}
-
-	public String getImageUrl() {
-		return imageUrl;
-	}
-
-	public void setImageUrl(String imageUrl) {
-		this.imageUrl = imageUrl;
-	}
+//	public String getName() {
+//		return name;
+//	}
+//
+//	public void setName(String name) {
+//		this.name = name;
+//	}
+//
+//	public String getDescription() {
+//		return description;
+//	}
+//
+//	public void setDescription(String description) {
+//		this.description = description;
+//	}
+//
+//	public BigDecimal getPrice() {
+//		return price;
+//	}
+//
+//	public void setPrice(BigDecimal price) {
+//		this.price = price;
+//	}
+//
+//	public String getCategory() {
+//		return category;
+//	}
+//
+//	public void setCategory(String category) {
+//		this.category = category;
+//	}
+//
+//	public String getImageUrl() {
+//		return imageUrl;
+//	}
+//
+//	public void setImageUrl(String imageUrl) {
+//		this.imageUrl = imageUrl;
+//	}
 
 	@NotBlank(message = "Product name is required")
 	@Size(max = 150, message = "Product name should not exceed 150 characters")
@@ -70,5 +76,5 @@ public class ProductCreateRequest {
 	
 
 	
-	public ProductCreateRequest() {}
+//	public ProductCreateRequest() {}
 }

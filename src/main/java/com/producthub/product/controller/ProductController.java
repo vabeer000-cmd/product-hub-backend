@@ -36,109 +36,109 @@ import jakarta.validation.Valid;
 public class ProductController {
 
 	private final ProductService productService;
-	
+
 	public ProductController(ProductService productService) {
 		this.productService = productService;
 	}
-	
+
 	@PostMapping
-	@PreAuthorize("hasRole('ADMIN')")
+	@PreAuthorize("hasAnyRole('ADMIN','PRODUCTOWNER')")
 	@ResponseStatus(HttpStatus.CREATED)
-	
+
 	public ProductResponse createProduct(@Valid @RequestBody ProductCreateRequest request) {
-		
+
 		return productService.createProduct(request);
-		
-	}
-	
 
-	
+	}
+
+
+
 	@GetMapping
-	@PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('USER', 'ADMIN','PRODUCTOWNER')")
 	public Page<ProductResponse> getAllProducts(
-	        @RequestParam(required = false) String category,
-	        @RequestParam(required = false) Boolean available,
-	        @RequestParam(required = false) BigDecimal minPrice,
-	        @RequestParam(required = false) BigDecimal maxPrice,
-	        @RequestParam(required = false) String search,
-	        Pageable pageable) {
+			@RequestParam(required = false) String category,
+			@RequestParam(required = false) Boolean available,
+			@RequestParam(required = false) BigDecimal minPrice,
+			@RequestParam(required = false) BigDecimal maxPrice,
+			@RequestParam(required = false) String search,
+			Pageable pageable) {
 
-	    ProductFilter filter = new ProductFilter();
+		ProductFilter filter = new ProductFilter();
 
-	    filter.setCategory(category);
-	    filter.setAvailable(available);
-	    filter.setMinPrice(minPrice);
-	    filter.setMaxPrice(maxPrice);
-	    filter.setSearch(search);
+		filter.setCategory(category);
+		filter.setAvailable(available);
+		filter.setMinPrice(minPrice);
+		filter.setMaxPrice(maxPrice);
+		filter.setSearch(search);
 
-	    if (pageable.getSort().isUnsorted()) {
-	        pageable = PageRequest.of(
-	                pageable.getPageNumber(),
-	                pageable.getPageSize(),
-	                Sort.by(
-	                		   Sort.Order.desc("createdAt"),
-	                		    Sort.Order.desc("id")
-	                )
-	        );
-	    }
+		if (pageable.getSort().isUnsorted()) {
+			pageable = PageRequest.of(
+					pageable.getPageNumber(),
+					pageable.getPageSize(),
+					Sort.by(
+							Sort.Order.desc("createdAt"),
+							Sort.Order.desc("id")
+					)
+			);
+		}
 
-	    return productService.getAllProducts(
-	            filter,
-	            pageable
-	    );
+		return productService.getAllProducts(
+				filter,
+				pageable
+		);
 	}
-	   @GetMapping("/{id}")
-	   @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
-	   public ProductResponse getProductById(@PathVariable Long id) {
+	@GetMapping("/{id}")
+	@PreAuthorize("hasAnyRole('USER', 'ADMIN','PRODUCTOWNER')")
+	public ProductResponse getProductById(@PathVariable Long id) {
 
-	       return productService.getProductById(id);
-	   }
-	   
-	   @PutMapping("/{id}")
-	   @PreAuthorize("hasRole('ADMIN')")
-	   public ProductResponse updateProduct(@PathVariable Long id,
-			   								@Valid @RequestBody ProductUpdateRequest  request) {
-		   return productService.updateProduct(id, request);
-		   
-	   }
-	   
-	   @PreAuthorize("hasRole('ADMIN')")
-	   @DeleteMapping("/{id}")
-	  
-	   @ResponseStatus(HttpStatus.NO_CONTENT)
-	   public void deleteProduct(@PathVariable Long id) {
-		   
-		   productService.deleteProduct(id);
-		   
-	   }
-	   
-	   @GetMapping("/cursor")
-	   @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
-	   public ProductCursorResponse getProductsByCursor(
-	           @RequestParam(defaultValue = "20") Integer limit,
-	           @RequestParam(required = false) String cursor,
-	           @RequestParam(required = false) String category,
-	           @RequestParam(required = false) Boolean available,
-	           @RequestParam(required = false) BigDecimal minPrice,
-	           @RequestParam(required = false) BigDecimal maxPrice,
-	           @RequestParam(required = false) String search) {
+		return productService.getProductById(id);
+	}
 
-	       return productService.getProductsByCursor(
-	               limit,
-	               cursor,
-	               category,
-	               available,
-	               minPrice,
-	               maxPrice,
-	               search
-	       );
-	   }	
-	   
-	   @PutMapping("/withoutsave/{id}")
-	   public void updateProductWithoutSave(@PathVariable Long id) {
-		   System.out.println("Id of update : "+id);
-		    productService.updatePriductByIdWithOutSave(id);
-		    System.out.println("Product updated successfully");
-		   
-	   }
+	@PutMapping("/{id}")
+	@PreAuthorize("hasAnyRole('ADMIN','PRODUCTOWNER')")
+	public ProductResponse updateProduct(@PathVariable Long id,
+										 @Valid @RequestBody ProductUpdateRequest  request) {
+		return productService.updateProduct(id, request);
+
+	}
+
+	@PreAuthorize("hasAnyRole('ADMIN','PRODUCTOWNER')")
+	@DeleteMapping("/{id}")
+
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void deleteProduct(@PathVariable Long id) {
+
+		productService.deleteProduct(id);
+
+	}
+
+	@GetMapping("/cursor")
+	@PreAuthorize("hasAnyRole('USER', 'ADMIN','PRODUCTOWNER')")
+	public ProductCursorResponse getProductsByCursor(
+			@RequestParam(defaultValue = "20") Integer limit,
+			@RequestParam(required = false) String cursor,
+			@RequestParam(required = false) String category,
+			@RequestParam(required = false) Boolean available,
+			@RequestParam(required = false) BigDecimal minPrice,
+			@RequestParam(required = false) BigDecimal maxPrice,
+			@RequestParam(required = false) String search) {
+
+		return productService.getProductsByCursor(
+				limit,
+				cursor,
+				category,
+				available,
+				minPrice,
+				maxPrice,
+				search
+		);
+	}
+
+	@PutMapping("/withoutsave/{id}")
+	public void updateProductWithoutSave(@PathVariable Long id) {
+		System.out.println("Id of update : "+id);
+		productService.updatePriductByIdWithOutSave(id);
+		System.out.println("Product updated successfully");
+
+	}
 }

@@ -83,6 +83,30 @@ public class UserServiceImpl implements UserService {
 
         return new LoginResponse(
                 accessToken,
-                refreshToken.getToken());
+                refreshToken.getToken(),
+                user.getUsername(),
+                user.getId(),
+                user.getRole()
+        );
+    }
+
+    @Override
+    public void registerProductOwner(RegisterRequest request) {
+
+        if (userRepository.existsByUsername(request.getUsername())) {
+            throw new UsernameAlreadyExistsException("Username already exists");
+        }
+
+        String hashedPassword =
+                passwordEncoder.encode(request.getPassword());
+
+
+        User user = new User(
+                request.getUsername(),
+                hashedPassword,
+                Role.PRODUCTOWNER
+        );
+
+        userRepository.save(user);
     }
 }

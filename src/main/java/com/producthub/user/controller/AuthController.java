@@ -1,5 +1,6 @@
 package com.producthub.user.controller;
 
+import com.producthub.user.entity.User;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -59,13 +60,18 @@ public class AuthController {
 
         refreshTokenService.verifyExpiration(refreshToken);
 
+        User user = refreshToken.getUser();
+
         String accessToken =
                 jwtService.generateToken(
                         refreshToken.getUser().getUsername());
 
         return new LoginResponse(
                 accessToken,
-                refreshToken.getToken());
+                refreshToken.getToken(),
+                user.getUsername(),
+                user.getId(),
+                user.getRole());
     }
     
     @PostMapping("/logout")
@@ -76,5 +82,12 @@ public class AuthController {
                 request.getRefreshToken());
 
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/product-owners/register")
+    @ResponseStatus(HttpStatus.CREATED)
+    public void registerProductOwner(@Valid @RequestBody RegisterRequest request) {
+
+        userService.registerProductOwner(request);
     }
 }

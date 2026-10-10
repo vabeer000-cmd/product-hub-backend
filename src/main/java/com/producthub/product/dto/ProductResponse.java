@@ -86,6 +86,11 @@ public class ProductResponse {
 	private Boolean available;
 	private LocalDateTime createdAt;
 	private LocalDateTime updatedAt;
+	private Long ownerId;
+	public Long getOwnerId() {
+		return ownerId;
+	}
+	public void setOwnerId(Long ownerId) {this.ownerId = ownerId;}
 	
 	private Long version;
 	
